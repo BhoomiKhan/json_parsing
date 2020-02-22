@@ -1,23 +1,109 @@
 package com.autobad.jsonparsing;
 
 import android.app.ProgressDialog;
+import android.content.Context;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
+import android.net.wifi.WifiManager;
 import android.os.Bundle;
+import android.text.format.Formatter;
 import android.util.Log;
 import android.widget.TextView;
+
 import androidx.appcompat.app.AppCompatActivity;
+
 import com.google.gson.JsonObject;
 import com.koushikdutta.async.future.FutureCallback;
 import com.koushikdutta.ion.Ion;
 
+import java.net.InetAddress;
+import java.net.NetworkInterface;
+import java.util.Enumeration;
+
 public class MainActivity extends AppCompatActivity {
 
     private String ip, type, continent_code, continent_name, country_code, country_name, region_code, region_name, city, zip, latitude, longitude, geoname_id, capital, lang_code, lang_name, native_lang, country_flag, country_flag_emoji, country_flag_emoji_unicode, calling_code, is_eu;
+    private TextView mIP, mType, mContinent_code, mContinent_name, mCountry_code, mCountry_name, mRegion_code, mRegion_name, mCity, mZip, mLatitude, mLongitude, mGeoname_id, mCapital, mLang_code, mLang_name, mNative_lang, mCountry_flag, mCountry_flag_emoji, mCountry_flag_emoji_unicode, mCalling_code, mIs_eu;
+    String IPaddress;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        NetwordDetect();
         callAPI();
+        init();
+    }
+
+    private void init() {
+        mIP=findViewById(R.id.ip);
+        mType=findViewById(R.id.type);
+        mContinent_code=findViewById(R.id.continent_code);
+        mContinent_name=findViewById(R.id.continent_name);
+        mCountry_code=findViewById(R.id.country_code);
+        mCountry_name=findViewById(R.id.country_name);
+        mRegion_code=findViewById(R.id.region_code);
+        mRegion_name=findViewById(R.id.region_name);
+        mCity=findViewById(R.id.city);
+        mZip=findViewById(R.id.zip);
+        mLatitude=findViewById(R.id.latitude);
+        mLongitude=findViewById(R.id.longitude);
+        mCountry_flag=findViewById(R.id.country_flag);
+        mCountry_flag_emoji=findViewById(R.id.country_flag_emoji);
+        mCountry_flag_emoji_unicode=findViewById(R.id.country_flag_emoji_unicode);
+        mCalling_code=findViewById(R.id.calling_code);
+    }
+
+    //Check the internet connection.
+    private void NetwordDetect() {
+        boolean WIFI = false;
+        boolean MOBILE = false;
+
+        ConnectivityManager CM = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+        NetworkInfo[] networkInfo = CM.getAllNetworkInfo();
+
+        for (NetworkInfo netInfo : networkInfo) {
+            if (netInfo.getTypeName().equalsIgnoreCase("WIFI"))
+                if (netInfo.isConnected())
+                    WIFI = true;
+            if (netInfo.getTypeName().equalsIgnoreCase("MOBILE"))
+                if (netInfo.isConnected())
+                    MOBILE = true;
+        }
+
+        if (WIFI == true) {
+            IPaddress = GetDeviceipWiFiData();
+            Log.d("ipaddressis",IPaddress);
+        }
+        if (MOBILE == true) {
+            IPaddress = GetDeviceipMobileData();
+            Log.d("ipaddressis",IPaddress);
+        }
+    }
+
+    public String GetDeviceipMobileData() {
+        try {
+            for (Enumeration<NetworkInterface> en = NetworkInterface.getNetworkInterfaces();
+                 en.hasMoreElements(); ) {
+                NetworkInterface networkinterface = en.nextElement();
+                for (Enumeration<InetAddress> enumIpAddr = networkinterface.getInetAddresses(); enumIpAddr.hasMoreElements(); ) {
+                    InetAddress inetAddress = enumIpAddr.nextElement();
+                    if (!inetAddress.isLoopbackAddress()) {
+                        return inetAddress.getHostAddress();
+                    }
+                }
+            }
+        } catch (Exception ex) {
+            Log.e("Current IP", ex.toString());
+        }
+        return null;
+    }
+
+    public String GetDeviceipWiFiData() {
+        WifiManager wm = (WifiManager) getSystemService(WIFI_SERVICE);
+        @SuppressWarnings("deprecation")
+        String ip = Formatter.formatIpAddress(wm.getConnectionInfo().getIpAddress());
+        return ip;
     }
 
     private void callAPI() {
@@ -32,8 +118,14 @@ public class MainActivity extends AppCompatActivity {
                 .asJsonObject().setCallback(new FutureCallback<JsonObject>() {
             @Override
             public void onCompleted(Exception e, JsonObject result) {
-                loadingdialog.dismiss();
-                jsonParsing(result);
+                try {
+                    Log.d("responsefromserver",result.toString());
+                    loadingdialog.dismiss();
+                    jsonParsing(result);
+                }
+                catch (Exception ex){
+                    Log.d("myexception", ex.toString());
+                }
             }
         });
     }
@@ -86,104 +178,62 @@ public class MainActivity extends AppCompatActivity {
             longitude = json.get("longitude").getAsString();
             Log.d("jsonparseresponse", longitude);
 
-                //location object
-                JsonObject locationObj = json.getAsJsonObject("location");
-                geoname_id = locationObj.get("geoname_id").getAsString();
-                Log.d("jsonparseresponse", geoname_id);
-                capital = locationObj.get("capital").getAsString();
-                Log.d("jsonparseresponse", capital);
+            //location object
+            JsonObject locationObj = json.getAsJsonObject("location");
+            geoname_id = locationObj.get("geoname_id").getAsString();
+            Log.d("jsonparseresponse", geoname_id);
+            capital = locationObj.get("capital").getAsString();
+            Log.d("jsonparseresponse", capital);
 
+            //get nested JSON Object for languages
+            JsonObject languagesJSONObj = locationObj.get("languages").getAsJsonArray().get(0).getAsJsonObject();
+            lang_code = languagesJSONObj.get("code").getAsString();
+            Log.d("langcode", lang_code);
 
-                        //get nested JSON Object for languages
-                        JsonObject languagesJSONObj = locationObj.get("languages").getAsJsonArray().get(0).getAsJsonObject();
-                        lang_code = languagesJSONObj.get("code").getAsString();
-                        Log.d("langcode", lang_code);
+            lang_name = languagesJSONObj.get("name").getAsString();
+            Log.d("langname", lang_name);
 
-                        lang_name = languagesJSONObj.get("name").getAsString();
-                        Log.d("langname", lang_name);
+            native_lang = languagesJSONObj.get("native").getAsString();
+            Log.d("langnative", native_lang);
 
-                        native_lang = languagesJSONObj.get("native").getAsString();
-                        Log.d("langnative", native_lang);
+            country_flag = locationObj.get("country_flag").getAsString();
+            Log.d("jsonparseresponse", country_flag);
 
-                country_flag = locationObj.get("country_flag").getAsString();
-                Log.d("jsonparseresponse", country_flag);
+            country_flag_emoji = locationObj.get("country_flag_emoji").getAsString();
+            Log.d("jsonparseresponse", country_flag_emoji);
 
-                country_flag_emoji = locationObj.get("country_flag_emoji").getAsString();
-                Log.d("jsonparseresponse", country_flag_emoji);
+            country_flag_emoji_unicode = locationObj.get("country_flag_emoji_unicode").getAsString();
+            Log.d("jsonparseresponse", country_flag_emoji_unicode);
 
-                country_flag_emoji_unicode = locationObj.get("country_flag_emoji_unicode").getAsString();
-                Log.d("jsonparseresponse", country_flag_emoji_unicode);
+            calling_code = locationObj.get("calling_code").getAsString();
+            Log.d("jsonparseresponse", calling_code);
 
-                calling_code = locationObj.get("calling_code").getAsString();
-                Log.d("jsonparseresponse", calling_code);
+            is_eu = locationObj.get("is_eu").getAsString();
+            Log.d("jsonparseresponse", is_eu);
 
-                is_eu = locationObj.get("is_eu").getAsString();
-                Log.d("jsonparseresponse", is_eu);
-
-
-
-
-
-
-            TextView ip, hostname, type, continent_code, continent_name, country_code, country_name, region_code, region_name, city, zip, latitude, geoname_id, code;
-            ip = findViewById(R.id.ip);
-            hostname = findViewById(R.id.hostname);
-            type = findViewById(R.id.type);
-            continent_code = findViewById(R.id.continent_code);
-            continent_name = findViewById(R.id.continent_name);
-            country_code = findViewById(R.id.country_code);
-            country_name = findViewById(R.id.country_name);
-            region_code = findViewById(R.id.region_code);
-            region_name = findViewById(R.id.region_name);
-            city = findViewById(R.id.city);
-            zip = findViewById(R.id.zip);
-            latitude = findViewById(R.id.latitude);
-//        geoname_id=findViewById(R.id.geoname_id);
-//        code=findViewById(R.id.code);
-
-
-//            JSONObject reader = new JSONObject(json);
-//            for (int i = 0; i < reader.length(); i++) {
-//                Log.d("jsonarray", reader.getString("hostname"));
-//            }
-
-//            ip.setText(reader.getString("ip"));
-//            hostname.setText(reader.getString("hostname"));
-//            Log.d("hostname", reader.getString("hostname"));
-//            Log.d("hostname", reader.getString("type"));
-//            Log.d("hostname", reader.getString("country_code"));
-//            type.setText(reader.getString("type"));
-//            continent_code.setText(reader.getString("continent_code"));
-//            continent_name.setText(reader.getString("continent_name"));
-//            country_code.setText(reader.getString("country_code"));
-//            country_name.setText(reader.getString("country_name"));
-//            region_code.setText(reader.getString("region_code"));
-//            region_name.setText(reader.getString("region_name"));
-//            city.setText(reader.getString("city"));
-//            zip.setText(reader.getString("zip"));
-//            latitude.setText(reader.getString("latitude"));
-
-//        geoname_id.setText(reader.getString("geoname_id"));
-//        code.setText(reader.getString("code"));
-
-//                JSONObject reader = new JSONObject(json);
-//        String ip=reader.getString("ip");
-//        Log.d("ipaddress",ip);
-//        String hostname=reader.getString("hostname");
-//        Toast.makeText(this, hostname, Toast.LENGTH_SHORT).show();
-//        String type=reader.getString("type");
-//        Toast.makeText(this, type, Toast.LENGTH_SHORT).show();
-//        String continent_code=reader.getString("continent_code");
-//        Toast.makeText(this, continent_code, Toast.LENGTH_SHORT).show();
-//        String continent_name=reader.getString("continent_name");
-//        Toast.makeText(this, continent_name, Toast.LENGTH_SHORT).show();
-//        String country_code=reader.getString("country_code");
-//        Log.d("countrycode",country_code);
-//        Toast.makeText(this, country_code, Toast.LENGTH_SHORT).show();
-//        String country_name=reader.getString("country_name");
-//        Toast.makeText(this, country_name, Toast.LENGTH_SHORT).show();
+            setText();
         } catch (Exception e) {
             Log.d("exception", e.toString());
         }
+    }
+
+    private void setText() {
+        mIP.setText(ip);
+        mType.setText(type);
+        mContinent_code.setText(continent_code);
+        mContinent_name.setText(continent_name);
+        mCountry_code.setText(country_code);
+        mCountry_name.setText(country_name);
+        mRegion_code.setText(region_code);
+        mRegion_name.setText(region_name);
+        mCity.setText(city);
+        mZip.setText(zip);
+        mLatitude.setText(latitude);
+        mLongitude.setText(longitude);
+        mCountry_flag.setText(country_flag);
+        mCountry_flag_emoji.setText(country_flag_emoji);
+        mCountry_flag_emoji_unicode.setText(country_flag_emoji_unicode);
+        mCalling_code.setText(calling_code);
+
     }
 }
